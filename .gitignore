@@ -30,6 +30,4 @@ __pycache__/
 .streamlit/secrets.toml
 
 # Large ML Model Files
-models/*.pkl
 
-models/*.pkl.gz
