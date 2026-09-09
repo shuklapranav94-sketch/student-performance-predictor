@@ -7,60 +7,226 @@ from datetime import datetime
 
 
 # =========================================================
-# 1. BASE DIRECTORY
+# 1. FIND PROJECT ROOT AUTOMATICALLY
 # =========================================================
 
-BASE_DIR = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(__file__)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# app.py is inside:
+# student-performance-predictor/app/app.py
+#
+# Therefore project root is one level above app/
+
+PROJECT_DIR = os.path.dirname(CURRENT_DIR)
+
+
+# =========================================================
+# 2. FIND MODELS DIRECTORY
+# =========================================================
+
+possible_model_dirs = [
+    os.path.join(PROJECT_DIR, "models"),
+    os.path.join(CURRENT_DIR, "models"),
+]
+
+MODELS_DIR = None
+
+for folder in possible_model_dirs:
+    if os.path.isdir(folder):
+        MODELS_DIR = folder
+        break
+
+
+# If models folder cannot be found
+if MODELS_DIR is None:
+
+    st.error("❌ MODELS FOLDER NOT FOUND")
+
+    st.write("Current app location:")
+    st.code(CURRENT_DIR)
+
+    st.write("Project location:")
+    st.code(PROJECT_DIR)
+
+    st.write("Python is searching these locations:")
+
+    for folder in possible_model_dirs:
+        st.code(folder)
+
+    st.stop()
+
+
+# =========================================================
+# 3. FIND DATA DIRECTORY
+# =========================================================
+
+possible_data_dirs = [
+    os.path.join(PROJECT_DIR, "data"),
+    os.path.join(CURRENT_DIR, "data"),
+]
+
+DATA_DIR = None
+
+for folder in possible_data_dirs:
+    if os.path.isdir(folder):
+        DATA_DIR = folder
+        break
+
+
+# Create data directory if needed
+
+if DATA_DIR is None:
+
+    DATA_DIR = os.path.join(
+        PROJECT_DIR,
+        "data"
     )
+
+    os.makedirs(
+        DATA_DIR,
+        exist_ok=True
+    )
+
+
+# =========================================================
+# 4. FUNCTION TO FIND FILE
+# =========================================================
+
+def find_file(folder, possible_names):
+
+    for name in possible_names:
+
+        path = os.path.join(
+            folder,
+            name
+        )
+
+        if os.path.isfile(path):
+
+            return path
+
+    return None
+
+
+# =========================================================
+# 5. FIND MODEL FILE
+# =========================================================
+
+model_candidates = [
+
+    "student_performance_final_model.pkl",
+
+    "student_performance_model.pkl",
+
+    "student_performance.pkl",
+
+    "final_model.pkl",
+
+    "model.pkl",
+
+    "best_model.pkl",
+
+    "student_performance_final_model.joblib",
+
+    "student_performance_model.joblib",
+
+    "model.joblib",
+
+]
+
+
+MODEL_PATH = find_file(
+    MODELS_DIR,
+    model_candidates
 )
 
 
 # =========================================================
-# 2. DIRECTORIES
+# 6. AUTOMATIC MODEL SEARCH
 # =========================================================
 
-MODELS_DIR = os.path.join(
-    BASE_DIR,
-    "models"
-)
+if MODEL_PATH is None:
 
-DATA_DIR = os.path.join(
-    BASE_DIR,
-    "data"
-)
+    all_model_files = []
 
-# Automatically create data folder if it does not exist
-os.makedirs(
-    DATA_DIR,
-    exist_ok=True
-)
+    for filename in os.listdir(MODELS_DIR):
+
+        lower_name = filename.lower()
+
+        if (
+            lower_name.endswith(".pkl")
+            or lower_name.endswith(".joblib")
+            or lower_name.endswith(".pkl.gz")
+            or lower_name.endswith(".joblib.gz")
+        ):
+
+            # Do not use metrics/preprocessor as prediction model
+
+            if not any(
+                word in lower_name
+                for word in [
+                    "metric",
+                    "confusion",
+                    "preprocessor",
+                    "comparison",
+                    "history"
+                ]
+            ):
+
+                all_model_files.append(
+                    filename
+                )
+
+
+    if len(all_model_files) > 0:
+
+        MODEL_PATH = os.path.join(
+            MODELS_DIR,
+            all_model_files[0]
+        )
 
 
 # =========================================================
-# 3. FILE PATHS
+# 7. FIND OTHER FILES
 # =========================================================
 
-MODEL_PATH = os.path.join(
+METRICS_PATH = find_file(
     MODELS_DIR,
-    "student_performance_final_model.pkl"
+    [
+        "model_metrics.pkl",
+        "metrics.pkl",
+        "model_metrics.joblib"
+    ]
 )
 
-METRICS_PATH = os.path.join(
+
+CONFUSION_MATRIX_PATH = find_file(
     MODELS_DIR,
-    "model_metrics.pkl"
+    [
+        "confusion_matrix.pkl",
+        "confusion_matrix.joblib"
+    ]
 )
 
-CONFUSION_MATRIX_PATH = os.path.join(
+
+MODEL_COMPARISON_PATH = find_file(
     MODELS_DIR,
-    "confusion_matrix.pkl"
+    [
+        "model_comparison_results.csv",
+        "model_comparison.csv",
+        "model_comparison_results.pkl"
+    ]
 )
 
-MODEL_COMPARISON_PATH = os.path.join(
+
+PREPROCESSOR_PATH = find_file(
     MODELS_DIR,
-    "model_comparison_results.csv"
+    [
+        "preprocessor.pkl",
+        "preprocessor.joblib"
+    ]
 )
+
 
 HISTORY_PATH = os.path.join(
     DATA_DIR,
@@ -69,7 +235,7 @@ HISTORY_PATH = os.path.join(
 
 
 # =========================================================
-# 4. PAGE CONFIGURATION
+# 8. PAGE CONFIG
 # =========================================================
 
 st.set_page_config(
@@ -80,8 +246,45 @@ st.set_page_config(
 
 
 # =========================================================
-# 5. LOAD MODEL
+# 9. MODEL LOADING
 # =========================================================
+
+if MODEL_PATH is None:
+
+    st.error("❌ MODEL LOADING ERROR")
+
+    st.write(
+        "No trained model file was found."
+    )
+
+    st.write("Models folder being searched:")
+
+    st.code(
+        MODELS_DIR
+    )
+
+    st.write("Files currently inside models folder:")
+
+    try:
+
+        files = os.listdir(
+            MODELS_DIR
+        )
+
+        for file in files:
+
+            st.write(
+                "📄 " + file
+            )
+
+    except Exception as e:
+
+        st.error(
+            str(e)
+        )
+
+    st.stop()
+
 
 try:
 
@@ -89,113 +292,117 @@ try:
         MODEL_PATH
     )
 
-except FileNotFoundError:
-
-    st.error(
-        "❌ Model file not found. "
-        "Please check the models folder."
-    )
-
-    st.stop()
-
 except Exception as e:
 
     st.error(
-        f"❌ Error loading model: {e}"
+        "❌ MODEL FOUND BUT COULD NOT BE LOADED"
+    )
+
+    st.write(
+        "Model path:"
+    )
+
+    st.code(
+        MODEL_PATH
+    )
+
+    st.write(
+        "Error:"
+    )
+
+    st.code(
+        str(e)
     )
 
     st.stop()
 
 
 # =========================================================
-# 6. LOAD MODEL METRICS
+# 10. LOAD PREPROCESSOR
 # =========================================================
 
-try:
+preprocessor = None
 
-    metrics = joblib.load(
-        METRICS_PATH
-    )
+if PREPROCESSOR_PATH is not None:
 
-except FileNotFoundError:
+    try:
 
-    st.error(
-        "❌ Model metrics file not found."
-    )
+        preprocessor = joblib.load(
+            PREPROCESSOR_PATH
+        )
 
-    st.stop()
+    except Exception:
 
-except Exception as e:
-
-    st.error(
-        f"❌ Error loading model metrics: {e}"
-    )
-
-    st.stop()
+        preprocessor = None
 
 
 # =========================================================
-# 7. LOAD CONFUSION MATRIX
+# 11. LOAD METRICS
 # =========================================================
 
-try:
+metrics = {}
 
-    cm = joblib.load(
-        CONFUSION_MATRIX_PATH
-    )
+if METRICS_PATH is not None:
 
-except FileNotFoundError:
+    try:
 
-    st.error(
-        "❌ Confusion matrix file not found."
-    )
+        metrics = joblib.load(
+            METRICS_PATH
+        )
 
-    st.stop()
+    except Exception:
 
-except Exception as e:
-
-    st.error(
-        f"❌ Error loading confusion matrix: {e}"
-    )
-
-    st.stop()
+        metrics = {}
 
 
 # =========================================================
-# 8. LOAD MODEL COMPARISON
+# 12. LOAD CONFUSION MATRIX
 # =========================================================
 
-try:
+cm = None
 
-    model_comparison = pd.read_csv(
-        MODEL_COMPARISON_PATH
-    )
+if CONFUSION_MATRIX_PATH is not None:
 
-except FileNotFoundError:
+    try:
 
-    st.error(
-        "❌ Model comparison file not found."
-    )
+        cm = joblib.load(
+            CONFUSION_MATRIX_PATH
+        )
 
-    st.info(
-        "Please make sure "
-        "'model_comparison_results.csv' "
-        "exists inside the models folder."
-    )
+    except Exception:
 
-    st.stop()
-
-except Exception as e:
-
-    st.error(
-        f"❌ Error loading model comparison: {e}"
-    )
-
-    st.stop()
+        cm = None
 
 
 # =========================================================
-# 9. SAVE PREDICTION HISTORY FUNCTION
+# 13. LOAD MODEL COMPARISON
+# =========================================================
+
+model_comparison = None
+
+if MODEL_COMPARISON_PATH is not None:
+
+    try:
+
+        if MODEL_COMPARISON_PATH.endswith(".csv"):
+
+            model_comparison = pd.read_csv(
+                MODEL_COMPARISON_PATH
+            )
+
+        else:
+
+            model_comparison = joblib.load(
+                MODEL_COMPARISON_PATH
+            )
+
+    except Exception:
+
+        model_comparison = None
+
+
+# =========================================================
+# 14. SAVE HISTORY
 # =========================================================
 
 def save_prediction_history(data):
@@ -204,7 +411,9 @@ def save_prediction_history(data):
         [data]
     )
 
-    if os.path.exists(HISTORY_PATH):
+    if os.path.exists(
+        HISTORY_PATH
+    ):
 
         history_df.to_csv(
             HISTORY_PATH,
@@ -224,7 +433,7 @@ def save_prediction_history(data):
 
 
 # =========================================================
-# 10. CUSTOM CSS
+# 15. CSS
 # =========================================================
 
 st.markdown(
@@ -251,7 +460,7 @@ st.markdown(
 
 
 # =========================================================
-# 11. SIDEBAR NAVIGATION
+# 16. SIDEBAR
 # =========================================================
 
 st.sidebar.title(
@@ -279,7 +488,7 @@ page = st.sidebar.radio(
 
 
 # =========================================================
-# HOME PAGE
+# HOME
 # =========================================================
 
 if page == "🏠 Home":
@@ -305,61 +514,47 @@ if page == "🏠 Home":
     )
 
     st.write(
-        "This application uses Machine Learning to "
-        "predict a student's academic performance "
+        "This application uses Machine Learning "
+        "to predict a student's academic performance "
         "based on academic, behavioural and "
         "learning-related information."
     )
 
-    st.subheader(
-        "🚀 Project Features"
-    )
+    col1, col2 = st.columns(2)
 
-    feature_col1, feature_col2 = st.columns(2)
-
-    with feature_col1:
+    with col1:
 
         st.info(
             "🤖 Machine Learning Prediction\n\n"
             "Predict student performance using "
-            "multiple student-related features."
+            "student-related features."
         )
 
         st.info(
             "📊 Performance Analysis\n\n"
-            "Analyze academic and learning indicators "
-            "using interactive charts."
+            "Analyze academic and learning indicators."
         )
 
         st.info(
             "💡 Personalized Recommendations\n\n"
-            "Get suggestions based on the student's "
-            "selected inputs."
+            "Get suggestions based on student inputs."
         )
 
-    with feature_col2:
+    with col2:
 
         st.info(
             "📈 Prediction Probability\n\n"
-            "View probability distribution for "
-            "different performance classes."
+            "View probability distribution."
         )
 
         st.info(
             "🎯 Model Evaluation\n\n"
-            "View accuracy, precision, recall, "
-            "F1-score and confusion matrix."
-        )
-
-        st.info(
-            "📥 Download Report\n\n"
-            "Download the student's prediction report "
-            "as a CSV file."
+            "View accuracy, precision, recall and F1-score."
         )
 
         st.info(
             "📜 Prediction History\n\n"
-            "Store and review previous student predictions."
+            "Store and review previous predictions."
         )
 
     st.subheader(
@@ -368,30 +563,29 @@ if page == "🏠 Home":
 
     st.write(
         """
-        **Student Input**
+        Student Input
         ↓
-        **Input Validation**
+        Input Validation
         ↓
-        **Feature Engineering**
+        Feature Engineering
         ↓
-        **Machine Learning Model**
+        Machine Learning Model
         ↓
-        **Performance Prediction**
+        Performance Prediction
         ↓
-        **Analysis & Recommendations**
+        Analysis & Recommendations
         ↓
-        **Prediction History**
+        Prediction History
         """
     )
 
     st.success(
-        "👉 Go to the Prediction page from the "
-        "sidebar to test the model."
+        "👉 Go to the Prediction page from the sidebar."
     )
 
 
 # =========================================================
-# PREDICTION PAGE
+# PREDICTION
 # =========================================================
 
 elif page == "🤖 Prediction":
@@ -412,10 +606,9 @@ elif page == "🤖 Prediction":
 
     st.divider()
 
-
-    # =====================================================
-    # ACADEMIC INFORMATION
-    # =====================================================
+    # -----------------------------------------------------
+    # ACADEMIC
+    # -----------------------------------------------------
 
     st.header(
         "📚 Academic Information"
@@ -453,13 +646,11 @@ elif page == "🤖 Prediction":
             step=1.0
         )
 
-
     st.divider()
 
-
-    # =====================================================
-    # STUDENT INFORMATION
-    # =====================================================
+    # -----------------------------------------------------
+    # STUDENT
+    # -----------------------------------------------------
 
     st.header(
         "👤 Student Information"
@@ -507,13 +698,11 @@ elif page == "🤖 Prediction":
             learning_style_label.split()[-1]
         )
 
-
     st.divider()
 
-
-    # =====================================================
-    # LEARNING & RESOURCES
-    # =====================================================
+    # -----------------------------------------------------
+    # RESOURCES
+    # -----------------------------------------------------
 
     st.header(
         "💻 Learning & Resources"
@@ -560,13 +749,11 @@ elif page == "🤖 Prediction":
             step=1
         )
 
-
     st.divider()
 
-
-    # =====================================================
-    # BEHAVIOUR & ENGAGEMENT
-    # =====================================================
+    # -----------------------------------------------------
+    # BEHAVIOUR
+    # -----------------------------------------------------
 
     st.header(
         "📈 Behaviour & Engagement"
@@ -617,13 +804,11 @@ elif page == "🤖 Prediction":
             extracurricular_label.split()[-1]
         )
 
-
     st.divider()
 
-
-    # =====================================================
-    # OTHER INFORMATION
-    # =====================================================
+    # -----------------------------------------------------
+    # OTHER
+    # -----------------------------------------------------
 
     st.header(
         "🧠 Other Information"
@@ -660,1040 +845,642 @@ elif page == "🤖 Prediction":
             stress_level_label.split()[-1]
         )
 
-
     st.divider()
 
-
-    # =====================================================
-    # STEP 23
-    # ADVANCED INPUT VALIDATION
-    # =====================================================
-
-    validation_errors = []
-
-
-    # =====================================================
-    # NUMERIC VALIDATION
-    # =====================================================
-
-    if pd.isna(study_hours):
-
-        validation_errors.append(
-            "Study hours cannot be empty."
-        )
-
-
-    if pd.isna(attendance):
-
-        validation_errors.append(
-            "Attendance cannot be empty."
-        )
-
-
-    if pd.isna(assignment_completion):
-
-        validation_errors.append(
-            "Assignment completion cannot be empty."
-        )
-
-
-    if pd.isna(age):
-
-        validation_errors.append(
-            "Age cannot be empty."
-        )
-
-
-    if pd.isna(online_courses):
-
-        validation_errors.append(
-            "Online courses cannot be empty."
-        )
-
-
-    # =====================================================
-    # RANGE VALIDATION
-    # =====================================================
-
-    if not pd.isna(study_hours):
-
-        if study_hours < 0 or study_hours > 24:
-
-            validation_errors.append(
-                "❌ Study hours must be between 0 and 24."
-            )
-
-
-    if not pd.isna(attendance):
-
-        if attendance < 0 or attendance > 100:
-
-            validation_errors.append(
-                "❌ Attendance must be between 0% and 100%."
-            )
-
-
-    if not pd.isna(assignment_completion):
-
-        if assignment_completion < 0 or assignment_completion > 100:
-
-            validation_errors.append(
-                "❌ Assignment completion must be between 0% and 100%."
-            )
-
-
-    if not pd.isna(age):
-
-        if age < 10 or age > 30:
-
-            validation_errors.append(
-                "❌ Age must be between 10 and 30."
-            )
-
-
-    if not pd.isna(online_courses):
-
-        if online_courses < 0 or online_courses > 20:
-
-            validation_errors.append(
-                "❌ Online courses must be between 0 and 20."
-            )
-
-
-    # =====================================================
-    # CATEGORY VALIDATION
-    # =====================================================
-
-    if gender not in [0, 1]:
-
-        validation_errors.append(
-            "❌ Invalid gender value selected."
-        )
-
-
-    if learning_style not in [0, 1, 2, 3]:
-
-        validation_errors.append(
-            "❌ Invalid learning style selected."
-        )
-
-
-    if resources not in [0, 1, 2]:
-
-        validation_errors.append(
-            "❌ Invalid resources value selected."
-        )
-
-
-    if internet not in [0, 1]:
-
-        validation_errors.append(
-            "❌ Invalid internet access value selected."
-        )
-
-
-    if motivation not in [0, 1, 2]:
-
-        validation_errors.append(
-            "❌ Invalid motivation value selected."
-        )
-
-
-    if discussions not in [0, 1]:
-
-        validation_errors.append(
-            "❌ Invalid discussion value selected."
-        )
-
-
-    if extracurricular not in [0, 1]:
-
-        validation_errors.append(
-            "❌ Invalid extracurricular value selected."
-        )
-
-
-    if edutech not in [0, 1]:
-
-        validation_errors.append(
-            "❌ Invalid EduTech value selected."
-        )
-
-
-    if stress_level not in [0, 1, 2]:
-
-        validation_errors.append(
-            "❌ Invalid stress level selected."
-        )
-
-
-    # =====================================================
+    # -----------------------------------------------------
     # FEATURE ENGINEERING
-    # =====================================================
+    # -----------------------------------------------------
 
     academic_engagement = (
-        attendance + assignment_completion
+        attendance +
+        assignment_completion
     ) / 2
 
 
-    # =====================================================
-    # PREDICTION BUTTON
-    # =====================================================
+    # -----------------------------------------------------
+    # PREDICT
+    # -----------------------------------------------------
 
-    st.write("")
-
-    predict_button = st.button(
+    if st.button(
         "🔮 Predict Performance",
         use_container_width=True
-    )
+    ):
+
+        input_data = pd.DataFrame({
+
+            "StudyHours": [study_hours],
+
+            "Attendance": [attendance],
+
+            "Resources": [resources],
+
+            "Extracurricular": [extracurricular],
+
+            "Motivation": [motivation],
+
+            "Internet": [internet],
+
+            "Gender": [gender],
+
+            "Age": [age],
+
+            "LearningStyle": [learning_style],
+
+            "OnlineCourses": [online_courses],
+
+            "Discussions": [discussions],
+
+            "AssignmentCompletion": [
+                assignment_completion
+            ],
+
+            "EduTech": [edutech],
+
+            "StressLevel": [stress_level],
+
+            "AcademicEngagement": [
+                academic_engagement
+            ]
+        })
 
 
-    if predict_button:
+        # -------------------------------------------------
+        # PREDICTION
+        # -------------------------------------------------
 
-        # =================================================
-        # DISPLAY VALIDATION ERRORS
-        # =================================================
+        try:
 
-        if len(validation_errors) > 0:
+            prediction_input = input_data
 
-            st.error(
-                "❌ Please correct the following inputs:"
-            )
-
-            for error in validation_errors:
-
-                st.warning(
-                    error
-                )
-
-
-        else:
-
+            # First try direct prediction
             try:
 
-                # =========================================
-                # CREATE INPUT DATAFRAME
-                # =========================================
+                prediction = model.predict(
+                    prediction_input
+                )[0]
 
-                input_data = pd.DataFrame({
+            except Exception as direct_error:
 
-                    "StudyHours": [study_hours],
+                # If separate preprocessor exists,
+                # transform the input and try again
 
-                    "Attendance": [attendance],
+                if preprocessor is None:
 
-                    "Resources": [resources],
+                    raise direct_error
 
-                    "Extracurricular": [
-                        extracurricular
-                    ],
-
-                    "Motivation": [motivation],
-
-                    "Internet": [internet],
-
-                    "Gender": [gender],
-
-                    "Age": [age],
-
-                    "LearningStyle": [
-                        learning_style
-                    ],
-
-                    "OnlineCourses": [
-                        online_courses
-                    ],
-
-                    "Discussions": [
-                        discussions
-                    ],
-
-                    "AssignmentCompletion": [
-                        assignment_completion
-                    ],
-
-                    "EduTech": [edutech],
-
-                    "StressLevel": [
-                        stress_level
-                    ],
-
-                    "AcademicEngagement": [
-                        academic_engagement
-                    ]
-                })
-
-
-                # =========================================
-                # VERIFY REQUIRED FEATURES
-                # =========================================
-
-                expected_features = [
-                    "StudyHours",
-                    "Attendance",
-                    "Resources",
-                    "Extracurricular",
-                    "Motivation",
-                    "Internet",
-                    "Gender",
-                    "Age",
-                    "LearningStyle",
-                    "OnlineCourses",
-                    "Discussions",
-                    "AssignmentCompletion",
-                    "EduTech",
-                    "StressLevel",
-                    "AcademicEngagement"
-                ]
-
-
-                missing_features = [
-                    feature
-                    for feature in expected_features
-                    if feature not in input_data.columns
-                ]
-
-
-                if len(missing_features) > 0:
-
-                    st.error(
-                        "❌ Some required model features are missing."
-                    )
-
-                    st.write(
-                        "Missing features:"
-                    )
-
-                    st.write(
-                        missing_features
-                    )
-
-                    st.stop()
-
-
-                # =========================================
-                # SAFE MODEL PREDICTION
-                # =========================================
-
-                try:
-
-                    prediction = model.predict(
+                transformed_data = (
+                    preprocessor.transform(
                         input_data
-                    )[0]
-
-                except Exception as prediction_error:
-
-                    st.error(
-                        "❌ Model prediction failed."
                     )
+                )
 
-                    with st.expander(
-                        "Technical Error"
-                    ):
-
-                        st.code(
-                            str(prediction_error)
-                        )
-
-                    st.stop()
+                prediction = model.predict(
+                    transformed_data
+                )[0]
 
 
-                # =========================================
-                # SAFE PREDICTION PROBABILITY
-                # =========================================
+        except Exception as e:
+
+            st.error(
+                "❌ MODEL PREDICTION FAILED"
+            )
+
+            st.write(
+                "Model loaded from:"
+            )
+
+            st.code(
+                MODEL_PATH
+            )
+
+            st.write(
+                "Error:"
+            )
+
+            st.code(
+                str(e)
+            )
+
+            st.stop()
+
+
+        # -------------------------------------------------
+        # PROBABILITY
+        # -------------------------------------------------
+
+        prediction_probabilities = None
+
+        try:
+
+            if hasattr(
+                model,
+                "predict_proba"
+            ):
 
                 try:
 
-                    if not hasattr(
-                        model,
-                        "predict_proba"
-                    ):
+                    prediction_probabilities = (
+                        model.predict_proba(
+                            input_data
+                        )[0]
+                    )
 
-                        st.warning(
-                            "⚠️ This model does not support "
-                            "prediction probabilities."
+                except Exception:
+
+                    if preprocessor is not None:
+
+                        transformed_data = (
+                            preprocessor.transform(
+                                input_data
+                            )
                         )
-
-                        prediction_probabilities = None
-
-                    else:
 
                         prediction_probabilities = (
                             model.predict_proba(
-                                input_data
+                                transformed_data
                             )[0]
                         )
 
-                except Exception as probability_error:
+        except Exception:
 
-                    st.warning(
-                        "⚠️ Prediction probability could "
-                        "not be calculated."
-                    )
+            prediction_probabilities = None
 
-                    with st.expander(
-                        "Technical Error"
-                    ):
 
-                        st.code(
-                            str(probability_error)
-                        )
+        # -------------------------------------------------
+        # LABELS
+        # -------------------------------------------------
 
-                    prediction_probabilities = None
+        grade_labels = {
 
+            0: "Low Performance",
 
-                # =========================================
-                # PREDICTION LABELS
-                # =========================================
+            1: "Below Average Performance",
 
-                grade_labels = {
+            2: "Good Performance",
 
-                    0: "Low Performance",
+            3: "Excellent Performance"
+        }
 
-                    1: "Below Average Performance",
 
-                    2: "Good Performance",
+        try:
 
-                    3: "Excellent Performance"
-                }
+            prediction_int = int(
+                prediction
+            )
 
+        except Exception:
 
-                result = grade_labels.get(
-                    prediction,
-                    "Unknown"
-                )
+            prediction_int = prediction
 
 
-                # =========================================
-                # CONFIDENCE
-                # =========================================
+        result = grade_labels.get(
+            prediction_int,
+            f"Performance Class {prediction}"
+        )
 
-                if prediction_probabilities is not None:
 
-                    if prediction < len(
-                        prediction_probabilities
-                    ):
+        # -------------------------------------------------
+        # CONFIDENCE
+        # -------------------------------------------------
 
-                        confidence = (
-                            prediction_probabilities[
-                                prediction
-                            ]
-                        )
+        confidence_percentage = 0
 
-                        confidence_percentage = (
-                            confidence * 100
-                        )
+        if prediction_probabilities is not None:
 
-                    else:
+            try:
 
-                        confidence_percentage = 0
-
-                else:
-
-                    confidence_percentage = 0
-
-
-                # =========================================
-                # RECOMMENDATIONS
-                # =========================================
-
-                recommendations = []
-
-
-                if study_hours < 3:
-
-                    recommendations.append(
-                        "📚 Try to increase your study time gradually. "
-                        "Aim for at least 3–4 focused study hours."
-                    )
-
-
-                if attendance < 75:
-
-                    recommendations.append(
-                        "🏫 Your attendance is relatively low. "
-                        "Try to attend classes more regularly."
-                    )
-
-
-                if assignment_completion < 70:
-
-                    recommendations.append(
-                        "📝 Complete more assignments on time "
-                        "to improve your academic performance."
-                    )
-
-
-                if online_courses == 0:
-
-                    recommendations.append(
-                        "💻 Consider taking an online course "
-                        "related to your subjects."
-                    )
-
-
-                if motivation == 0:
-
-                    recommendations.append(
-                        "🎯 Try setting small daily academic goals "
-                        "to improve your motivation."
-                    )
-
-
-                if discussions == 0:
-
-                    recommendations.append(
-                        "🙋 Participate more actively in class "
-                        "discussions and academic activities."
-                    )
-
-
-                if extracurricular == 0:
-
-                    recommendations.append(
-                        "⚽ Consider participating in suitable "
-                        "extracurricular activities for a balanced routine."
-                    )
-
-
-                if stress_level == 2:
-
-                    recommendations.append(
-                        "🧘 Your selected stress level is high. "
-                        "Take regular breaks and maintain a balanced study routine."
-                    )
-
-
-                if internet == 0:
-
-                    recommendations.append(
-                        "🌐 Access to reliable learning resources "
-                        "can help with your studies."
-                    )
-
-
-                if len(recommendations) == 0:
-
-                    recommendations.append(
-                        "🌟 Your current inputs look balanced. "
-                        "Keep maintaining your study routine!"
-                    )
-
-
-                # =========================================
-                # DISPLAY RESULT
-                # =========================================
-
-                st.divider()
-
-                st.header(
-                    "🎯 Prediction Result"
-                )
-
-
-                st.success(
-                    f"Predicted Performance: {result}"
-                )
-
-
-                st.metric(
-                    "Prediction Confidence",
-                    f"{confidence_percentage:.2f}%"
-                )
-
-
-                # =========================================
-                # STEP 25
-                # SAVE PREDICTION HISTORY
-                # =========================================
-
-                history_record = {
-
-                    "Date Time":
-                        datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-
-                    "Age":
-                        age,
-
-                    "Gender Code":
-                        gender,
-
-                    "Learning Style Code":
-                        learning_style,
-
-                    "Study Hours":
-                        study_hours,
-
-                    "Attendance (%)":
-                        attendance,
-
-                    "Assignment Completion (%)":
-                        assignment_completion,
-
-                    "Resources Code":
-                        resources,
-
-                    "Internet Access Code":
-                        internet,
-
-                    "Online Courses":
-                        online_courses,
-
-                    "Motivation Code":
-                        motivation,
-
-                    "Discussion Participation Code":
-                        discussions,
-
-                    "Extracurricular Activities Code":
-                        extracurricular,
-
-                    "EduTech Usage Code":
-                        edutech,
-
-                    "Stress Level Code":
-                        stress_level,
-
-                    "Academic Engagement":
-                        round(
-                            academic_engagement,
-                            2
-                        ),
-
-                    "Predicted Performance":
-                        result,
-
-                    "Confidence (%)":
-                        round(
-                            confidence_percentage,
-                            2
-                        )
-                }
-
-
-                save_prediction_history(
-                    history_record
-                )
-
-
-                st.success(
-                    "✅ Prediction saved to Prediction History."
-                )
-
-
-                # =========================================
-                # TECHNICAL DETAILS
-                # =========================================
-
-                with st.expander(
-                    "🔍 Technical Prediction Details"
-                ):
-
-                    st.write(
-                        f"Predicted Class: {prediction}"
-                    )
-
-
-                # =========================================
-                # RECOMMENDATIONS
-                # =========================================
-
-                st.subheader(
-                    "💡 Personalized Recommendations"
-                )
-
-
-                for recommendation in recommendations:
-
-                    st.info(
-                        recommendation
-                    )
-
-
-                # =========================================
-                # STUDENT ANALYSIS
-                # =========================================
-
-                st.divider()
-
-                st.subheader(
-                    "📊 Student Analysis Dashboard"
-                )
-
-
-                st.write(
-                    "### 👤 Student Profile"
-                )
-
-
-                profile_col1, profile_col2, profile_col3 = st.columns(3)
-
-
-                with profile_col1:
-
-                    st.metric(
-                        "Age",
-                        f"{age} years"
-                    )
-
-
-                with profile_col2:
-
-                    st.metric(
-                        "Study Hours",
-                        f"{study_hours} hrs/day"
-                    )
-
-
-                with profile_col3:
-
-                    st.metric(
-                        "Attendance",
-                        f"{attendance:.0f}%"
-                    )
-
-
-                # =========================================
-                # ACADEMIC INDICATORS
-                # =========================================
-
-                st.write(
-                    "### 📚 Academic Indicators"
-                )
-
-
-                academic_data = pd.DataFrame({
-
-                    "Indicator": [
-                        "Attendance",
-                        "Assignment Completion",
-                        "Academic Engagement"
-                    ],
-
-                    "Score": [
-                        attendance,
-                        assignment_completion,
-                        academic_engagement
-                    ]
-                })
-
-
-                st.bar_chart(
-                    academic_data.set_index(
-                        "Indicator"
-                    )
-                )
-
-
-                # =========================================
-                # LEARNING ACTIVITY
-                # =========================================
-
-                st.write(
-                    "### 💻 Learning Activity"
-                )
-
-
-                learning_data = pd.DataFrame({
-
-                    "Activity": [
-                        "Study Hours",
-                        "Online Courses"
-                    ],
-
-                    "Value": [
-                        study_hours,
-                        online_courses
-                    ]
-                })
-
-
-                st.bar_chart(
-                    learning_data.set_index(
-                        "Activity"
-                    )
-                )
-
-
-                # =========================================
-                # ENGAGEMENT SUMMARY
-                # =========================================
-
-                st.write(
-                    "### 📈 Engagement Summary"
-                )
-
-
-                engagement_col1, engagement_col2, engagement_col3 = st.columns(3)
-
-
-                with engagement_col1:
-
-                    st.metric(
-                        "Motivation Level",
-                        str(motivation)
-                    )
-
-
-                with engagement_col2:
-
-                    st.metric(
-                        "Discussion Level",
-                        str(discussions)
-                    )
-
-
-                with engagement_col3:
-
-                    st.metric(
-                        "Academic Engagement",
-                        f"{academic_engagement:.2f}"
-                    )
-
-
-                # =========================================
-                # PROBABILITY TABLE
-                # =========================================
-
-                if prediction_probabilities is not None:
-
-                    st.subheader(
-                        "📊 Prediction Probability"
-                    )
-
-
-                    probability_data = pd.DataFrame({
-
-                        "Performance": [
-                            grade_labels.get(
-                                i,
-                                f"Class {i}"
-                            )
-                            for i in range(
-                                len(
-                                    prediction_probabilities
-                                )
-                            )
-                        ],
-
-                        "Probability": [
-                            round(
-                                probability * 100,
-                                2
-                            )
-                            for probability in (
+                classes = getattr(
+                    model,
+                    "classes_",
+                    list(
+                        range(
+                            len(
                                 prediction_probabilities
                             )
-                        ]
-                    })
-
-
-                    st.dataframe(
-                        probability_data,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-
-                    # =====================================
-                    # PROBABILITY CHART
-                    # =====================================
-
-                    st.subheader(
-                        "📈 Performance Probability Chart"
-                    )
-
-
-                    chart_data = (
-                        probability_data
-                        .set_index("Performance")
-                    )
-
-
-                    st.bar_chart(
-                        chart_data["Probability"]
-                    )
-
-                else:
-
-                    st.info(
-                        "ℹ️ Probability information is "
-                        "not available for this model."
-                    )
-
-
-                # =========================================
-                # DOWNLOAD REPORT
-                # =========================================
-
-                st.divider()
-
-                st.subheader(
-                    "📥 Download Student Report"
-                )
-
-
-                report_data = {
-
-                    "Student Performance Report": "",
-
-                    "Report Type":
-                        "Machine Learning Prediction Report",
-
-                    "Age": age,
-
-                    "Gender Code": gender,
-
-                    "Learning Style Code":
-                        learning_style,
-
-                    "Study Hours":
-                        study_hours,
-
-                    "Attendance (%)":
-                        attendance,
-
-                    "Assignment Completion (%)":
-                        assignment_completion,
-
-                    "Resources Code":
-                        resources,
-
-                    "Internet Access Code":
-                        internet,
-
-                    "Online Courses":
-                        online_courses,
-
-                    "Motivation Code":
-                        motivation,
-
-                    "Discussion Participation Code":
-                        discussions,
-
-                    "Extracurricular Activities Code":
-                        extracurricular,
-
-                    "EduTech Usage Code":
-                        edutech,
-
-                    "Stress Level Code":
-                        stress_level,
-
-                    "Academic Engagement":
-                        round(
-                            academic_engagement,
-                            2
-                        ),
-
-                    "Predicted Performance":
-                        result,
-
-                    "Prediction Confidence (%)":
-                        round(
-                            confidence_percentage,
-                            2
                         )
-                }
-
-
-                report_df = pd.DataFrame(
-                    list(
-                        report_data.items()
-                    ),
-                    columns=[
-                        "Parameter",
-                        "Value"
-                    ]
+                    )
                 )
 
+                if prediction in classes:
 
-                recommendation_rows = []
-
-
-                for index, recommendation in enumerate(
-                    recommendations,
-                    start=1
-                ):
-
-                    recommendation_rows.append({
-
-                        "Parameter":
-                            f"Recommendation {index}",
-
-                        "Value":
-                            recommendation
-                    })
-
-
-                recommendation_df = pd.DataFrame(
-                    recommendation_rows
-                )
-
-
-                final_report = pd.concat(
-                    [
-                        report_df,
-                        recommendation_df
-                    ],
-                    ignore_index=True
-                )
-
-
-                report_csv = final_report.to_csv(
-                    index=False
-                )
-
-
-                st.download_button(
-
-                    label="📥 Download Student Report",
-
-                    data=report_csv,
-
-                    file_name="student_performance_report.csv",
-
-                    mime="text/csv",
-
-                    use_container_width=True
-                )
-
-
-            # =============================================
-            # ERROR HANDLING
-            # =============================================
-
-            except ValueError as e:
-
-                st.error(
-                    "❌ Invalid input format. "
-                    "Please check the entered values."
-                )
-
-                with st.expander(
-                    "Technical Error"
-                ):
-
-                    st.code(
-                        str(e)
+                    prediction_index = list(
+                        classes
+                    ).index(
+                        prediction
                     )
 
+                    confidence_percentage = (
+                        prediction_probabilities[
+                            prediction_index
+                        ] * 100
+                    )
 
-            except Exception as e:
+            except Exception:
 
-                st.error(
-                    "❌ Something went wrong while "
-                    "making the prediction."
+                confidence_percentage = (
+                    max(
+                        prediction_probabilities
+                    ) * 100
                 )
 
-                with st.expander(
-                    "Technical Error"
-                ):
 
-                    st.code(
-                        str(e)
+        # -------------------------------------------------
+        # RESULT
+        # -------------------------------------------------
+
+        st.divider()
+
+        st.header(
+            "🎯 Prediction Result"
+        )
+
+        st.success(
+            f"Predicted Performance: {result}"
+        )
+
+        st.metric(
+            "Prediction Confidence",
+            f"{confidence_percentage:.2f}%"
+        )
+
+
+        # -------------------------------------------------
+        # RECOMMENDATIONS
+        # -------------------------------------------------
+
+        recommendations = []
+
+
+        if study_hours < 3:
+
+            recommendations.append(
+                "📚 Try to increase your study time gradually."
+            )
+
+
+        if attendance < 75:
+
+            recommendations.append(
+                "🏫 Try to attend classes more regularly."
+            )
+
+
+        if assignment_completion < 70:
+
+            recommendations.append(
+                "📝 Complete more assignments on time."
+            )
+
+
+        if online_courses == 0:
+
+            recommendations.append(
+                "💻 Consider taking an online course."
+            )
+
+
+        if motivation == 0:
+
+            recommendations.append(
+                "🎯 Try setting small daily academic goals."
+            )
+
+
+        if discussions == 0:
+
+            recommendations.append(
+                "🙋 Participate more actively in discussions."
+            )
+
+
+        if extracurricular == 0:
+
+            recommendations.append(
+                "⚽ Consider suitable extracurricular activities."
+            )
+
+
+        if stress_level == 2:
+
+            recommendations.append(
+                "🧘 Maintain a balanced study routine."
+            )
+
+
+        if len(recommendations) == 0:
+
+            recommendations.append(
+                "🌟 Your current inputs look balanced. "
+                "Keep maintaining your study routine!"
+            )
+
+
+        st.subheader(
+            "💡 Personalized Recommendations"
+        )
+
+
+        for recommendation in recommendations:
+
+            st.info(
+                recommendation
+            )
+
+
+        # -------------------------------------------------
+        # SAVE HISTORY
+        # -------------------------------------------------
+
+        history_record = {
+
+            "Date Time":
+                datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+
+            "Age": age,
+
+            "Gender Code": gender,
+
+            "Learning Style Code":
+                learning_style,
+
+            "Study Hours":
+                study_hours,
+
+            "Attendance (%)":
+                attendance,
+
+            "Assignment Completion (%)":
+                assignment_completion,
+
+            "Resources Code":
+                resources,
+
+            "Internet Access Code":
+                internet,
+
+            "Online Courses":
+                online_courses,
+
+            "Motivation Code":
+                motivation,
+
+            "Discussion Participation Code":
+                discussions,
+
+            "Extracurricular Activities Code":
+                extracurricular,
+
+            "EduTech Usage Code":
+                edutech,
+
+            "Stress Level Code":
+                stress_level,
+
+            "Academic Engagement":
+                round(
+                    academic_engagement,
+                    2
+                ),
+
+            "Predicted Performance":
+                result,
+
+            "Confidence (%)":
+                round(
+                    confidence_percentage,
+                    2
+                )
+        }
+
+
+        save_prediction_history(
+            history_record
+        )
+
+
+        st.success(
+            "✅ Prediction saved to Prediction History."
+        )
+
+
+        # -------------------------------------------------
+        # STUDENT DASHBOARD
+        # -------------------------------------------------
+
+        st.divider()
+
+        st.subheader(
+            "📊 Student Analysis Dashboard"
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "Age",
+                f"{age} years"
+            )
+
+        with col2:
+
+            st.metric(
+                "Study Hours",
+                f"{study_hours} hrs/day"
+            )
+
+        with col3:
+
+            st.metric(
+                "Attendance",
+                f"{attendance:.0f}%"
+            )
+
+
+        # -------------------------------------------------
+        # ACADEMIC CHART
+        # -------------------------------------------------
+
+        academic_data = pd.DataFrame({
+
+            "Indicator": [
+                "Attendance",
+                "Assignment Completion",
+                "Academic Engagement"
+            ],
+
+            "Score": [
+                attendance,
+                assignment_completion,
+                academic_engagement
+            ]
+        })
+
+
+        st.subheader(
+            "📚 Academic Indicators"
+        )
+
+        st.bar_chart(
+            academic_data.set_index(
+                "Indicator"
+            )
+        )
+
+
+        # -------------------------------------------------
+        # LEARNING CHART
+        # -------------------------------------------------
+
+        learning_data = pd.DataFrame({
+
+            "Activity": [
+                "Study Hours",
+                "Online Courses"
+            ],
+
+            "Value": [
+                study_hours,
+                online_courses
+            ]
+        })
+
+
+        st.subheader(
+            "💻 Learning Activity"
+        )
+
+        st.bar_chart(
+            learning_data.set_index(
+                "Activity"
+            )
+        )
+
+
+        # -------------------------------------------------
+        # PROBABILITY
+        # -------------------------------------------------
+
+        if prediction_probabilities is not None:
+
+            st.subheader(
+                "📊 Prediction Probability"
+            )
+
+
+            probability_data = pd.DataFrame({
+
+                "Performance": [
+                    grade_labels.get(
+                        i,
+                        f"Class {i}"
                     )
+                    for i in range(
+                        len(
+                            prediction_probabilities
+                        )
+                    )
+                ],
+
+                "Probability": [
+                    round(
+                        p * 100,
+                        2
+                    )
+                    for p in prediction_probabilities
+                ]
+            })
+
+
+            st.dataframe(
+                probability_data,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            st.subheader(
+                "📈 Performance Probability Chart"
+            )
+
+
+            st.bar_chart(
+                probability_data.set_index(
+                    "Performance"
+                )
+            )
+
+
+        # -------------------------------------------------
+        # DOWNLOAD REPORT
+        # -------------------------------------------------
+
+        report = pd.DataFrame({
+
+            "Parameter": [
+                "Age",
+                "Gender Code",
+                "Learning Style Code",
+                "Study Hours",
+                "Attendance (%)",
+                "Assignment Completion (%)",
+                "Resources Code",
+                "Internet Access Code",
+                "Online Courses",
+                "Motivation Code",
+                "Discussion Participation Code",
+                "Extracurricular Activities Code",
+                "EduTech Usage Code",
+                "Stress Level Code",
+                "Academic Engagement",
+                "Predicted Performance",
+                "Prediction Confidence (%)"
+            ],
+
+            "Value": [
+                age,
+                gender,
+                learning_style,
+                study_hours,
+                attendance,
+                assignment_completion,
+                resources,
+                internet,
+                online_courses,
+                motivation,
+                discussions,
+                extracurricular,
+                edutech,
+                stress_level,
+                round(
+                    academic_engagement,
+                    2
+                ),
+                result,
+                round(
+                    confidence_percentage,
+                    2
+                )
+            ]
+        })
+
+
+        st.subheader(
+            "📥 Download Student Report"
+        )
+
+
+        st.download_button(
+            "📥 Download Student Report",
+            report.to_csv(
+                index=False
+            ),
+            "student_performance_report.csv",
+            "text/csv",
+            use_container_width=True
+        )
 
 
 # =========================================================
@@ -1709,137 +1496,108 @@ elif page == "📊 Model Dashboard":
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        '<div class="subtitle">'
-        'Evaluation of the trained Machine Learning model'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
     st.divider()
 
+    if len(metrics) == 0:
 
-    st.subheader(
-        "📈 Model Evaluation Metrics"
-    )
+        st.warning(
+            "⚠️ Model metrics file is not available."
+        )
+
+    else:
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            if "accuracy" in metrics:
+
+                st.metric(
+                    "Accuracy",
+                    f"{metrics['accuracy'] * 100:.2f}%"
+                )
+
+        with col2:
+
+            if "precision" in metrics:
+
+                st.metric(
+                    "Precision",
+                    f"{metrics['precision'] * 100:.2f}%"
+                )
+
+        with col3:
+
+            if "recall" in metrics:
+
+                st.metric(
+                    "Recall",
+                    f"{metrics['recall'] * 100:.2f}%"
+                )
+
+        with col4:
+
+            if "f1_score" in metrics:
+
+                st.metric(
+                    "F1 Score",
+                    f"{metrics['f1_score'] * 100:.2f}%"
+                )
 
 
-    col1, col2, col3, col4 = st.columns(4)
+    if cm is not None:
 
+        st.divider()
 
-    with col1:
+        st.subheader(
+            "📊 Confusion Matrix"
+        )
 
-        st.metric(
-            "Accuracy",
-            f"{metrics['accuracy'] * 100:.2f}%"
+        fig, ax = plt.subplots(
+            figsize=(7, 5)
+        )
+
+        ax.imshow(cm)
+
+        ax.set_title(
+            "Model Confusion Matrix"
+        )
+
+        ax.set_xlabel(
+            "Predicted Label"
+        )
+
+        ax.set_ylabel(
+            "Actual Label"
+        )
+
+        ax.set_xticks(
+            range(len(cm))
+        )
+
+        ax.set_yticks(
+            range(len(cm))
         )
 
 
-    with col2:
+        for i in range(len(cm)):
 
-        st.metric(
-            "Precision",
-            f"{metrics['precision'] * 100:.2f}%"
+            for j in range(len(cm)):
+
+                ax.text(
+                    j,
+                    i,
+                    cm[i, j],
+                    ha="center",
+                    va="center"
+                )
+
+
+        plt.tight_layout()
+
+        st.pyplot(
+            fig
         )
-
-
-    with col3:
-
-        st.metric(
-            "Recall",
-            f"{metrics['recall'] * 100:.2f}%"
-        )
-
-
-    with col4:
-
-        st.metric(
-            "F1 Score",
-            f"{metrics['f1_score'] * 100:.2f}%"
-        )
-
-
-    st.divider()
-
-
-    st.subheader(
-        "📊 Confusion Matrix"
-    )
-
-
-    fig, ax = plt.subplots(
-        figsize=(7, 5)
-    )
-
-
-    ax.imshow(cm)
-
-
-    ax.set_title(
-        "Model Confusion Matrix"
-    )
-
-
-    ax.set_xlabel(
-        "Predicted Label"
-    )
-
-
-    ax.set_ylabel(
-        "Actual Label"
-    )
-
-
-    ax.set_xticks(
-        range(len(cm))
-    )
-
-
-    ax.set_yticks(
-        range(len(cm))
-    )
-
-
-    for i in range(len(cm)):
-
-        for j in range(len(cm)):
-
-            ax.text(
-                j,
-                i,
-                cm[i, j],
-                ha="center",
-                va="center"
-            )
-
-
-    plt.tight_layout()
-
-
-    st.pyplot(
-        fig
-    )
-
-
-    st.divider()
-
-
-    st.subheader(
-        "🤖 Model Information"
-    )
-
-
-    st.write(
-        "The model predicts student academic "
-        "performance using academic, behavioural "
-        "and learning-related features."
-    )
-
-
-    st.write(
-        "The performance metrics above are calculated "
-        "using the test dataset."
-    )
 
 
 # =========================================================
@@ -1855,305 +1613,102 @@ elif page == "🏆 Model Comparison":
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        '<div class="subtitle">'
-        'Comparison of different Machine Learning algorithms'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
     st.divider()
 
+    if model_comparison is None:
 
-    required_columns = [
-        "Model",
-        "Accuracy",
-        "Precision",
-        "Recall",
-        "F1 Score"
-    ]
-
-
-    missing_columns = [
-        column
-        for column in required_columns
-        if column not in model_comparison.columns
-    ]
-
-
-    if len(missing_columns) > 0:
-
-        st.error(
-            "❌ Required columns are missing from "
-            "model_comparison_results.csv"
-        )
-
-        st.write(
-            "Missing columns:"
-        )
-
-        st.write(
-            missing_columns
+        st.warning(
+            "⚠️ Model comparison file not found."
         )
 
     else:
 
-        st.subheader(
-            "📊 Model Performance Comparison"
-        )
-
-
-        comparison_display = (
-            model_comparison.copy()
-        )
-
-
-        comparison_display["Accuracy"] = (
-            comparison_display["Accuracy"] * 100
-        ).round(2)
-
-
-        comparison_display["Precision"] = (
-            comparison_display["Precision"] * 100
-        ).round(2)
-
-
-        comparison_display["Recall"] = (
-            comparison_display["Recall"] * 100
-        ).round(2)
-
-
-        comparison_display["F1 Score"] = (
-            comparison_display["F1 Score"] * 100
-        ).round(2)
-
-
-        comparison_display = (
-            comparison_display.rename(
-                columns={
-                    "Accuracy": "Accuracy (%)",
-                    "Precision": "Precision (%)",
-                    "Recall": "Recall (%)",
-                    "F1 Score": "F1 Score (%)"
-                }
-            )
-        )
-
-
-        st.dataframe(
-            comparison_display,
-            use_container_width=True,
-            hide_index=True
-        )
-
-
-        # =================================================
-        # BEST MODEL
-        # =================================================
-
-        best_model_row = model_comparison.loc[
-            model_comparison["F1 Score"].idxmax()
+        required_columns = [
+            "Model",
+            "Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score"
         ]
 
+        missing = [
+            c
+            for c in required_columns
+            if c not in model_comparison.columns
+        ]
 
-        best_model_name = (
-            best_model_row["Model"]
-        )
+        if len(missing) > 0:
+
+            st.error(
+                "❌ Missing columns:"
+            )
+
+            st.write(
+                missing
+            )
+
+        else:
+
+            display = model_comparison.copy()
+
+            display["Accuracy"] = (
+                display["Accuracy"] * 100
+            ).round(2)
+
+            display["Precision"] = (
+                display["Precision"] * 100
+            ).round(2)
+
+            display["Recall"] = (
+                display["Recall"] * 100
+            ).round(2)
+
+            display["F1 Score"] = (
+                display["F1 Score"] * 100
+            ).round(2)
 
 
-        best_model_accuracy = (
-            best_model_row["Accuracy"] * 100
-        )
-
-
-        best_model_f1 = (
-            best_model_row["F1 Score"] * 100
-        )
-
-
-        st.success(
-            f"🏆 Best Performing Model: "
-            f"{best_model_name}"
-        )
-
-
-        best_col1, best_col2 = st.columns(2)
-
-
-        with best_col1:
-
-            st.metric(
-                "Best Model Accuracy",
-                f"{best_model_accuracy:.2f}%"
+            st.dataframe(
+                display,
+                use_container_width=True,
+                hide_index=True
             )
 
 
-        with best_col2:
+            best = model_comparison.loc[
+                model_comparison[
+                    "F1 Score"
+                ].idxmax()
+            ]
 
-            st.metric(
-                "Best Model F1 Score",
-                f"{best_model_f1:.2f}%"
+
+            st.success(
+                f"🏆 Best Performing Model: "
+                f"{best['Model']}"
             )
 
 
-        # =================================================
-        # ACCURACY
-        # =================================================
-
-        st.divider()
-
-        st.subheader(
-            "📈 Accuracy Comparison"
-        )
-
-
-        accuracy_chart = (
-            comparison_display[
+            chart = display[
                 [
                     "Model",
-                    "Accuracy (%)"
+                    "Accuracy"
                 ]
-            ]
-            .set_index("Model")
-        )
+            ].set_index(
+                "Model"
+            )
 
 
-        st.bar_chart(
-            accuracy_chart
-        )
+            st.subheader(
+                "📈 Accuracy Comparison"
+            )
 
-
-        # =================================================
-        # PRECISION
-        # =================================================
-
-        st.subheader(
-            "🎯 Precision Comparison"
-        )
-
-
-        precision_chart = (
-            comparison_display[
-                [
-                    "Model",
-                    "Precision (%)"
-                ]
-            ]
-            .set_index("Model")
-        )
-
-
-        st.bar_chart(
-            precision_chart
-        )
-
-
-        # =================================================
-        # RECALL
-        # =================================================
-
-        st.subheader(
-            "🔍 Recall Comparison"
-        )
-
-
-        recall_chart = (
-            comparison_display[
-                [
-                    "Model",
-                    "Recall (%)"
-                ]
-            ]
-            .set_index("Model")
-        )
-
-
-        st.bar_chart(
-            recall_chart
-        )
-
-
-        # =================================================
-        # F1 SCORE
-        # =================================================
-
-        st.subheader(
-            "⭐ F1 Score Comparison"
-        )
-
-
-        f1_chart = (
-            comparison_display[
-                [
-                    "Model",
-                    "F1 Score (%)"
-                ]
-            ]
-            .set_index("Model")
-        )
-
-
-        st.bar_chart(
-            f1_chart
-        )
-
-
-        # =================================================
-        # COMPLETE METRICS
-        # =================================================
-
-        st.subheader(
-            "📊 Complete Metrics Comparison"
-        )
-
-
-        all_metrics_chart = (
-            comparison_display[
-                [
-                    "Model",
-                    "Accuracy (%)",
-                    "Precision (%)",
-                    "Recall (%)",
-                    "F1 Score (%)"
-                ]
-            ]
-            .set_index("Model")
-        )
-
-
-        st.bar_chart(
-            all_metrics_chart
-        )
-
-
-        # =================================================
-        # MODEL SELECTION
-        # =================================================
-
-        st.divider()
-
-        st.subheader(
-            "🧠 Why Was This Model Selected?"
-        )
-
-
-        st.write(
-            f"The **{best_model_name}** model was selected "
-            f"as the final model because it achieved the "
-            f"highest F1 Score among the evaluated models."
-        )
-
-
-        st.info(
-            "F1 Score provides a balance between Precision "
-            "and Recall and is useful when evaluating "
-            "classification models."
-        )
+            st.bar_chart(
+                chart
+            )
 
 
 # =========================================================
-# STEP 25
-# PREDICTION HISTORY
+# HISTORY
 # =========================================================
 
 elif page == "📜 Prediction History":
@@ -2165,31 +1720,15 @@ elif page == "📜 Prediction History":
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        '<div class="subtitle">'
-        'View previously generated student performance predictions'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
     st.divider()
 
-
-    # =====================================================
-    # CHECK HISTORY FILE
-    # =====================================================
-
-    if not os.path.exists(HISTORY_PATH):
+    if not os.path.exists(
+        HISTORY_PATH
+    ):
 
         st.info(
             "ℹ️ No prediction history available yet."
         )
-
-        st.write(
-            "Go to the 🤖 Prediction page and "
-            "make your first prediction."
-        )
-
 
     else:
 
@@ -2199,36 +1738,15 @@ elif page == "📜 Prediction History":
                 HISTORY_PATH
             )
 
-
-            # =================================================
-            # EMPTY HISTORY CHECK
-            # =================================================
-
             if history_df.empty:
 
                 st.info(
-                    "ℹ️ No predictions have been recorded yet."
+                    "ℹ️ No predictions recorded yet."
                 )
-
-                st.write(
-                    "Go to the 🤖 Prediction page and "
-                    "make your first prediction."
-                )
-
 
             else:
 
-                # =============================================
-                # HISTORY SUMMARY
-                # =============================================
-
-                st.subheader(
-                    "📊 History Summary"
-                )
-
-
                 col1, col2, col3 = st.columns(3)
-
 
                 with col1:
 
@@ -2237,46 +1755,28 @@ elif page == "📜 Prediction History":
                         len(history_df)
                     )
 
-
                 with col2:
 
-                    latest_prediction = (
+                    st.metric(
+                        "Latest Prediction",
                         history_df.iloc[-1][
                             "Predicted Performance"
                         ]
                     )
 
-                    st.metric(
-                        "Latest Prediction",
-                        latest_prediction
-                    )
-
-
                 with col3:
-
-                    average_confidence = (
-                        history_df[
-                            "Confidence (%)"
-                        ].mean()
-                    )
 
                     st.metric(
                         "Average Confidence",
-                        f"{average_confidence:.2f}%"
+                        f"{history_df['Confidence (%)'].mean():.2f}%"
                     )
 
 
                 st.divider()
 
-
-                # =============================================
-                # HISTORY TABLE
-                # =============================================
-
                 st.subheader(
                     "📋 Previous Predictions"
                 )
-
 
                 st.dataframe(
                     history_df,
@@ -2285,157 +1785,57 @@ elif page == "📜 Prediction History":
                 )
 
 
-                st.divider()
-
-
-                # =============================================
-                # PERFORMANCE DISTRIBUTION
-                # =============================================
-
                 st.subheader(
                     "📈 Performance Distribution"
                 )
 
-
-                performance_counts = (
+                st.bar_chart(
                     history_df[
                         "Predicted Performance"
-                    ]
-                    .value_counts()
+                    ].value_counts()
                 )
 
-
-                st.bar_chart(
-                    performance_counts
-                )
-
-
-                st.divider()
-
-
-                # =============================================
-                # CONFIDENCE HISTORY
-                # =============================================
 
                 st.subheader(
-                    "🎯 Prediction Confidence History"
+                    "🎯 Confidence History"
                 )
 
-
-                confidence_chart = (
+                st.line_chart(
                     history_df[
                         [
                             "Date Time",
                             "Confidence (%)"
                         ]
-                    ]
-                    .set_index("Date Time")
-                )
-
-
-                st.line_chart(
-                    confidence_chart
-                )
-
-
-                st.divider()
-
-
-                # =============================================
-                # DOWNLOAD HISTORY
-                # =============================================
-
-                st.subheader(
-                    "📥 Download Prediction History"
-                )
-
-
-                history_csv = history_df.to_csv(
-                    index=False
+                    ].set_index(
+                        "Date Time"
+                    )
                 )
 
 
                 st.download_button(
-
-                    label="📥 Download Complete History",
-
-                    data=history_csv,
-
-                    file_name="prediction_history.csv",
-
-                    mime="text/csv",
-
+                    "📥 Download Complete History",
+                    history_df.to_csv(
+                        index=False
+                    ),
+                    "prediction_history.csv",
+                    "text/csv",
                     use_container_width=True
                 )
 
 
-                st.divider()
-
-
-                # =============================================
-                # CLEAR HISTORY
-                # =============================================
-
-                st.subheader(
-                    "🗑️ History Management"
-                )
-
-
-                st.warning(
-                    "⚠️ Clearing history will permanently "
-                    "remove all saved prediction records."
-                )
-
-
-                if st.button(
-                    "🗑️ Clear Prediction History",
-                    use_container_width=True
-                ):
-
-                    try:
-
-                        os.remove(
-                            HISTORY_PATH
-                        )
-
-                        st.success(
-                            "✅ Prediction history cleared successfully."
-                        )
-
-                        st.rerun()
-
-                    except Exception as clear_error:
-
-                        st.error(
-                            "❌ Could not clear prediction history."
-                        )
-
-                        with st.expander(
-                            "Technical Error"
-                        ):
-
-                            st.code(
-                                str(clear_error)
-                            )
-
-
-        except Exception as history_error:
+        except Exception as e:
 
             st.error(
                 "❌ Error loading prediction history."
             )
 
-            with st.expander(
-                "Technical Error"
-            ):
-
-                st.code(
-                    str(history_error)
-                )
+            st.code(
+                str(e)
+            )
 
 
 # =========================================================
-# ABOUT PROJECT
+# ABOUT
 # =========================================================
 
 elif page == "ℹ️ About Project":
@@ -2449,35 +1849,21 @@ elif page == "ℹ️ About Project":
 
     st.divider()
 
-
     st.header(
         "🎯 Problem Statement"
     )
 
     st.write(
-        "The objective of this project is to develop "
-        "a Machine Learning based system that can "
-        "predict a student's academic performance "
-        "using different academic, behavioural and "
-        "learning-related features."
-    )
-
-
-    st.header(
-        "🚀 Project Objective"
-    )
-
-    st.write(
-        "The system aims to provide an early indication "
-        "of student performance and provide useful "
-        "recommendations based on the student's inputs."
+        "The objective is to develop a Machine Learning "
+        "system that predicts student academic performance "
+        "using academic, behavioural and learning-related "
+        "features."
     )
 
 
     st.header(
         "🛠️ Technologies Used"
     )
-
 
     technologies = pd.DataFrame({
 
@@ -2494,9 +1880,9 @@ elif page == "ℹ️ About Project":
             "Programming Language",
             "Data Processing",
             "Machine Learning",
-            "Model Saving & Loading",
+            "Model Saving",
             "Web Application",
-            "Data Visualization"
+            "Visualization"
         ]
     })
 
@@ -2512,85 +1898,22 @@ elif page == "ℹ️ About Project":
         "🔄 Machine Learning Workflow"
     )
 
-
     st.write(
         """
         1. Dataset Collection
-
         2. Data Cleaning
-
         3. Exploratory Data Analysis
-
         4. Feature Engineering
-
         5. Data Preprocessing
-
         6. Model Training
-
         7. Model Evaluation
-
         8. Model Saving
-
         9. Streamlit Application
-
-        10. Student Performance Prediction
-
+        10. Prediction
         11. Model Comparison
-
-        12. Personalized Recommendations
-
-        13. Input Validation
-
-        14. Error Handling
-
-        15. Prediction History
+        12. Recommendations
+        13. Prediction History
         """
-    )
-
-
-    st.header(
-        "📋 Project Features"
-    )
-
-
-    st.write(
-        """
-        • Student performance prediction
-
-        • Prediction confidence
-
-        • Performance probability
-
-        • Personalized recommendations
-
-        • Student analysis dashboard
-
-        • Model performance dashboard
-
-        • Confusion matrix
-
-        • Downloadable prediction report
-
-        • Input validation
-
-        • Error handling
-
-        • Machine Learning model comparison
-
-        • Prediction history
-
-        • Performance distribution
-
-        • Confidence history
-
-        • Downloadable prediction history
-        """
-    )
-
-
-    st.success(
-        "Student Performance Predictor is an "
-        "end-to-end Machine Learning project."
     )
 
 
