@@ -246,3 +246,23 @@ student-performance-predictor/
 ├── .gitignore
 ├── README.md
 └── requirements.txt
+
+👨‍💻 Author
+
+Pranav Shukla
+
+B.Tech CSE (AI/ML)
+
+⭐ If you find this project useful
+
+Give the repository a ⭐ on GitHub.
+
+
+### 2. IMPORTANT
+
+README me:
+
+```text
+YOUR_REPOSITORY_URL
+
+ko baad me apne actual GitHub URL se replace karna.
