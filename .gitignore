@@ -31,3 +31,5 @@ __pycache__/
 
 # Large ML Model Files
 models/*.pkl
+
+models/*.pkl.gz
